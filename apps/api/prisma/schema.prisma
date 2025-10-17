@@ -1,0 +1,173 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Business {
+  id        String   @id @default(cuid())
+  name      String
+  kraPin    String?  @unique
+  contact   String?
+  plan      String   @default("starter")
+  createdAt DateTime @default(now())
+  users     User[]
+  debtors   Debtor[]
+  debts     Debt[]
+  communications Communication[]
+  templates     Template[]
+  workflows     Workflow[]
+  auditLogs     AuditLog[]
+  integrations  Integration[]
+}
+
+model User {
+  id          String   @id @default(cuid())
+  businessId  String
+  email       String   @unique
+  phoneE164   String?
+  passwordHash String
+  role        Role     @default(AGENT)
+  locale      String   @default("en")
+  createdAt   DateTime @default(now())
+  business    Business @relation(fields: [businessId], references: [id])
+  auditLogs   AuditLog[]
+}
+
+enum Role {
+  OWNER
+  MANAGER
+  AGENT
+}
+
+model Debtor {
+  id           String   @id @default(cuid())
+  businessId   String
+  name         String
+  nationalIdHash String?
+  phoneE164    String?
+  email        String?
+  address      String?
+  consentStatus String   @default("unknown")
+  createdAt    DateTime @default(now())
+  business     Business @relation(fields: [businessId], references: [id])
+  debts        Debt[]
+  communications Communication[]
+  riskScores   RiskScore[]
+}
+
+model Debt {
+  id           String    @id @default(cuid())
+  businessId   String
+  debtorId     String
+  reference    String
+  principal    Int
+  currency     String    @default("KES")
+  dueDate      DateTime
+  status       DebtStatus @default(OPEN)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  business     Business  @relation(fields: [businessId], references: [id])
+  debtor       Debtor    @relation(fields: [debtorId], references: [id])
+  paymentPlans PaymentPlan[]
+  payments     Payment[]
+}
+
+enum DebtStatus {
+  OPEN
+  PROMISE
+  IN_PLAN
+  SETTLED
+  WRITEOFF
+}
+
+model PaymentPlan {
+  id        String   @id @default(cuid())
+  debtId    String
+  status    String   @default("active")
+  schedule  Json
+  createdAt DateTime @default(now())
+  debt      Debt     @relation(fields: [debtId], references: [id])
+}
+
+model Payment {
+  id            String   @id @default(cuid())
+  debtId        String
+  amount        Int
+  method        String
+  status        String   @default("pending")
+  paidAt        DateTime?
+  mpesaReceipt  String?  @unique
+  rawPayload    Json?
+  createdAt     DateTime @default(now())
+  debt          Debt     @relation(fields: [debtId], references: [id])
+}
+
+model Communication {
+  id          String   @id @default(cuid())
+  businessId  String
+  debtorId    String
+  channel     String
+  templateId  String?
+  status      String
+  cost        Int?
+  sentAt      DateTime?
+  meta        Json?
+  business    Business @relation(fields: [businessId], references: [id])
+  debtor      Debtor   @relation(fields: [debtorId], references: [id])
+}
+
+model Template {
+  id         String   @id @default(cuid())
+  businessId String
+  channel    String
+  name       String
+  lang       String
+  body       String
+  business   Business @relation(fields: [businessId], references: [id])
+}
+
+model Workflow {
+  id         String   @id @default(cuid())
+  businessId String
+  name       String
+  spec       Json
+  active     Boolean  @default(true)
+  business   Business @relation(fields: [businessId], references: [id])
+}
+
+model RiskScore {
+  id           String   @id @default(cuid())
+  debtorId     String
+  modelVersion String
+  score        Float
+  features     Json
+  createdAt    DateTime @default(now())
+  debtor       Debtor   @relation(fields: [debtorId], references: [id])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  businessId String
+  actorId    String?
+  action     String
+  entity     String
+  entityId   String?
+  old        Json?
+  new        Json?
+  createdAt  DateTime @default(now())
+  business   Business @relation(fields: [businessId], references: [id])
+  actor      User?    @relation(fields: [actorId], references: [id])
+}
+
+model Integration {
+  id         String   @id @default(cuid())
+  businessId String
+  type       String
+  status     String   @default("disabled")
+  config     Json?
+  business   Business @relation(fields: [businessId], references: [id])
+}
